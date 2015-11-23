@@ -1,0 +1,150 @@
+<html>
+<head>
+    <script type='text/javascript' src='https://code.jquery.com/jquery-2.1.4.min.js'>
+    </script>
+    <script type='text/javascript'>
+        var regionData = {};
+        var regionDataList;
+        $(document).ready(function() {
+            $.ajax({
+                type: 'GET',
+                url: '/Neighborhood_Zhvi_SingleFamilyResidence.csv',
+                dataType: 'text',
+                success: function(data) {
+                    var lines = data.split(/\r\n|\n/);
+                    var headers = lines[0].split(',');
+                    var latestDataIndex = headers.length - 1;
+
+                    for(var i=1;i<lines.length;i++) {
+                        var line = lines[i].split(',');
+                        var rID = line[0];
+                        if(line[latestDataIndex]) { 
+                            regionData[rID] = {
+                                'median_price': parseInt(line[latestDataIndex]),
+                                'region': line[1].replace(/"/g,''),
+                                'city': line[2].replace(/"/g,''),
+                                'state': line[3].replace(/"/g,'')
+                            }
+                        }
+                    }
+
+                    getRentData();
+                }
+            });
+        });
+
+        function getRentData() {
+            $.ajax({
+                type: 'GET',
+                url: '/Neighborhood_Zri_AllHomes.csv',
+                dataType: 'text',
+                success: function(data) {
+                    var lines = data.split(/\r\n|\n/);
+                    var headers = lines[0].split(',');
+                    var latestDataIndex = headers.length - 1;
+
+                    for(var i=1;i<lines.length;i++) {
+                        var line = lines[i].split(',');
+                        var rID = line[0];
+                        if(regionData[rID]) {
+                            regionData[rID].median_rent = parseInt(line[latestDataIndex]);
+                            regionData[rID].gross_yield = 
+                                    regionData[rID].median_rent * 12
+                                /   regionData[rID].median_price;
+                        }
+                    }
+
+                    processData();
+                }
+            });
+        }
+    
+        function processData() {
+            $('body').append(
+                $('<ol>').append(
+                    $('<li>').html('Populate with price, rent, and gross yield'),
+                    $('<li>').html('Filter median prices between $100,000 and $165,000'),
+                    $('<li>').html('Display results in table with link to current listings')
+                ),
+                $('<p>', {html: 'Play with results in console with global variables regionData and regionDatalist.'})
+            );
+
+            regionDataList = hashToArray(regionData);
+            showInTable(
+                regionDataList.filter(function(region) {
+                    return region.median_price > 100000 && region.median_price < 165000;
+                })
+            );
+        }
+
+        function hashToArray(data) {
+            var newArray = [];
+            $.each(data, function(k, v) {
+                newArray.push({
+                    regionID: k,
+                    region: v.region,
+                    city: v.city,
+                    state: v.state,
+                    median_price: v.median_price,
+                    median_rent: v.median_rent,
+                    gross_yield: v.gross_yield
+                });
+            });
+
+            newArray.sort(function(a,b){
+                return b.gross_yield-a.gross_yield;
+            });
+            
+            return newArray;
+        }
+
+        function showInTable(dataList) {
+            $('body').append(
+                $('<table>').append(
+                    $('<thead>').append(
+                        $('<tr>').append(
+                            $('<td>', {html: 'Region'}),
+                            $('<td>', {html: 'City'}),
+                            $('<td>', {html: 'State'}),
+                            $('<td>', {html: 'Median Price'}),
+                            $('<td>', {html: 'Median Rent'}),
+                            $('<td>', {html: 'Gross Yield'}),
+                            $('<td>', {html: 'Link'})
+                        )
+                    ),
+                    $('<tbody>').append(
+                        dataList.map(function(region) {
+                            return $('<tr>').append(
+                                    $('<td>', {html: region.region}),
+                                    $('<td>', {html: region.city}),
+                                    $('<td>', {html: region.state}),
+                                    $('<td>', {html: '$' + delimitNumbers(region.median_price)}),
+                                    $('<td>', {html: '$' + delimitNumbers(region.median_rent)}),
+                                    $('<td>', {html: round(region.gross_yield * 100, 2) + '%'}),
+                                    $('<td>').append(
+                                        $('<a>', {html: 'Current Listings', target: '_blank', href: 'http://www.zillow.com/homes/' + region.region + ',-' + region.city.replace(/ /g,'-') + '-' + region.state + '_rb/100000-200000_price'})
+                                    )
+                                );
+                        })
+                    )
+                )
+            );
+        }
+
+    function delimitNumbers(str) {
+        return (str + "").replace(/\b(\d+)((\.\d+)*)\b/g, function(a, b, c) {
+            return (b.charAt(0) > 0 && !(c || ".").lastIndexOf(".") ? b.replace(/(\d)(?=(\d{3})+$)/g, "$1,") : b) + c;
+        });
+    }
+
+    function round(number, decimals) {
+        if(!decimals)
+            decimals = 0;
+        return Math.round(Math.pow(10, decimals) * number) / Math.pow(10, decimals);
+    }
+
+    </script>
+</head>
+<body>
+</body>
+</html>
