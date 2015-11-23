@@ -1,0 +1,2 @@
+- Run local server using ./server (Python required)
+- View results in browser: localhost:3000
